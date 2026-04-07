@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[build.environment]
+  PYTHON_VERSION = "3.12"
+
 [functions]
   directory = "netlify/functions"
   included_files = ["requirements.txt"]
