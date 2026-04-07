@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EpistemicLens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f0f0f;
+  --fg: #e8e6e3;
+  --fg-dim: #888;
+  --amber: #f59e0b;
+  --green: #22c55e;
+  --red: #ef4444;
+  --card-bg: #1a1a1a;
+  --border: #2a2a2a;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 60px 20px 40px;
+}
+
+/* STATE 1: INPUT */
+#input-state { text-align: center; }
+
+h1 {
+  font-family: var(--mono);
+  font-size: 2.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.subhead {
+  color: var(--fg-dim);
+  font-size: 1rem;
+  margin-bottom: 40px;
+}
+
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.toggle button {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 8px 20px;
+  background: transparent;
+  color: var(--fg-dim);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.toggle button.active {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+#url-input, #text-input {
+  display: block;
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#url-input:focus, #text-input:focus {
+  border-color: var(--amber);
+}
+
+#text-input {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.hidden { display: none !important; }
+
+#analyze-btn {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 40px;
+  margin-top: 20px;
+  background: var(--amber);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+
+#analyze-btn:hover { opacity: 0.85; }
+#analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.footer-note {
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+  margin-top: 40px;
+}
+
+/* STATE 2: LOADING */
+#loading-state {
+  text-align: center;
+  padding-top: 120px;
+}
+
+.loading-text {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  color: var(--fg-dim);
+}
+
+@keyframes ellipsis {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
+.loading-text::after {
+  content: '';
+  animation: ellipsis 1.5s infinite;
+}
+
+/* STATE 3: RESULTS */
+#results-state {}
+
+.score-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.composite-score {
+  font-family: var(--mono);
+  font-size: 4rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.grade {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.score-green { color: var(--green); }
+.score-amber { color: var(--amber); }
+.score-red { color: var(--red); }
+
+.summary {
+  color: var(--fg-dim);
+  font-size: 0.95rem;
+  margin-bottom: 32px;
+  line-height: 1.7;
+}
+
+.dimensions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.dim-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+
+.dim-name {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  margin-bottom: 8px;
+}
+
+.dim-bar-track {
+  height: 4px;
+  background: var(--border);
+  margin-bottom: 8px;
+}
+
+.dim-bar-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.dim-score-label {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+
+.dim-notes {
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
+.dim-card.locked .dim-name::before {
+  content: '\1F512 ';
+}
+
+.section-title {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+  color: var(--amber);
+}
+
+.weak-list { list-style: none; }
+
+.weak-item {
+  border-left: 2px solid var(--amber);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--card-bg);
+}
+
+.weak-sentence {
+  font-style: italic;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.weak-reason {
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+  margin-bottom: 6px;
+}
+
+.weak-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weak-category {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  background: var(--border);
+  padding: 2px 8px;
+  color: var(--fg-dim);
+}
+
+.copy-btn {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.copy-btn:hover { border-color: var(--fg-dim); }
+
+#reset-btn {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 10px 28px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  margin-top: 24px;
+  transition: border-color 0.15s;
+}
+
+#reset-btn:hover { border-color: var(--fg-dim); }
+
+.error-msg {
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 560px) {
+  .dimensions-grid { grid-template-columns: 1fr; }
+  .composite-score { font-size: 3rem; }
+  h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- STATE 1: INPUT -->
+  <div id="input-state">
+    <h1>EpistemicLens</h1>
+    <p class="subhead">Score the epistemic quality of any news article.</p>
+    <div class="toggle">
+      <button id="toggle-url" class="active" onclick="setMode('url')">URL</button>
+      <button id="toggle-text" onclick="setMode('text')">Paste Text</button>
+    </div>
+    <div>
+      <input id="url-input" type="url" placeholder="https://example.com/article" spellcheck="false">
+      <textarea id="text-input" class="hidden" placeholder="Paste the full article text here..."></textarea>
+    </div>
+    <button id="analyze-btn" onclick="analyze()">Analyze</button>
+    <div id="error-box" class="error-msg hidden"></div>
+    <p class="footer-note">Scores reasoning quality and sourcing rigor — not political conclusions.</p>
+  </div>
+
+  <!-- STATE 2: LOADING -->
+  <div id="loading-state" class="hidden">
+    <p class="loading-text">Extracting and analyzing article</p>
+  </div>
+
+  <!-- STATE 3: RESULTS -->
+  <div id="results-state" class="hidden"></div>
+
+</div>
+
+<script>
+let mode = 'url';
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('toggle-url').classList.toggle('active', m === 'url');
+  document.getElementById('toggle-text').classList.toggle('active', m === 'text');
+  document.getElementById('url-input').classList.toggle('hidden', m !== 'url');
+  document.getElementById('text-input').classList.toggle('hidden', m !== 'text');
+}
+
+function showState(name) {
+  document.getElementById('input-state').classList.toggle('hidden', name !== 'input');
+  document.getElementById('loading-state').classList.toggle('hidden', name !== 'loading');
+  document.getElementById('results-state').classList.toggle('hidden', name !== 'results');
+}
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.classList.remove('hidden');
+}
+
+function clearError() {
+  document.getElementById('error-box').classList.add('hidden');
+}
+
+async function analyze() {
+  clearError();
+  const input = mode === 'url'
+    ? document.getElementById('url-input').value.trim()
+    : document.getElementById('text-input').value.trim();
+
+  if (!input) {
+    showError(mode === 'url' ? 'Enter a URL.' : 'Paste article text.');
+    return;
+  }
+
+  showState('loading');
+
+  try {
+    const resp = await fetch('/api/score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input, input_type: mode }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Request failed.' }));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    renderResults(data);
+    showState('results');
+  } catch (e) {
+    showState('input');
+    showError(e.message);
+  }
+}
+
+function scoreColor(score) {
+  if (score >= 80) return 'score-green';
+  if (score >= 50) return 'score-amber';
+  return 'score-red';
+}
+
+function barColor(score) {
+  if (score >= 7) return 'var(--green)';
+  if (score >= 5) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function renderResults(data) {
+  const c = data.composite_score;
+  const colorClass = scoreColor(c);
+  const dims = data.dimensions;
+  const dimOrder = [
+    ['source_quality', 'Source Quality'],
+    ['claim_grounding', 'Claim Grounding'],
+    ['logical_integrity', 'Logical Integrity'],
+    ['completeness_balance', 'Completeness & Balance'],
+    ['language_precision', 'Language Precision'],
+    ['author_transparency', 'Author Transparency'],
+  ];
+
+  let dimCards = dimOrder.map(([key, label]) => {
+    const d = dims[key];
+    const isLocked = d.score === null || d.score === undefined;
+    const score = isLocked ? '—' : d.score;
+    const pct = isLocked ? 0 : (d.score / 10) * 100;
+    const color = isLocked ? 'var(--border)' : barColor(d.score);
+    return `
+      <div class="dim-card${isLocked ? ' locked' : ''}">
+        <div class="dim-name">${label}</div>
+        <div class="dim-bar-track"><div class="dim-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="dim-score-label">${score}${isLocked ? '' : ' / 10'}</div>
+        <div class="dim-notes">${escHtml(d.notes)}</div>
+      </div>`;
+  }).join('');
+
+  let weakItems = '';
+  if (data.weak_sentences && data.weak_sentences.length > 0) {
+    weakItems = data.weak_sentences.map((w, i) => `
+      <li class="weak-item">
+        <div class="weak-sentence">${escHtml(w.text)}</div>
+        <div class="weak-reason">${escHtml(w.reason)}</div>
+        <div class="weak-meta">
+          <span class="weak-category">${escHtml(w.category)}</span>
+          <button class="copy-btn" onclick="copyText(this, ${i})">Copy</button>
+        </div>
+      </li>`).join('');
+  }
+
+  document.getElementById('results-state').innerHTML = `
+    <div class="score-header">
+      <span class="composite-score ${colorClass}">${c}</span>
+      <span class="grade ${colorClass}">${data.grade}</span>
+    </div>
+    <p class="summary">${escHtml(data.summary)}</p>
+    <div class="section-title">Dimensions</div>
+    <div class="dimensions-grid">${dimCards}</div>
+    ${weakItems ? `<div class="section-title">Weak Sentences</div><ul class="weak-list">${weakItems}</ul>` : ''}
+    <button id="reset-btn" onclick="resetApp()">Analyze another article</button>
+  `;
+
+  window._weakSentences = data.weak_sentences || [];
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function copyText(btn, idx) {
+  const text = window._weakSentences[idx]?.text || '';
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function resetApp() {
+  document.getElementById('url-input').value = '';
+  document.getElementById('text-input').value = '';
+  document.getElementById('results-state').innerHTML = '';
+  showState('input');
+}
+</script>
+</body>
+</html>

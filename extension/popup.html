@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f0f0f;
+  --fg: #e8e6e3;
+  --fg-dim: #888;
+  --amber: #f59e0b;
+  --green: #22c55e;
+  --red: #ef4444;
+  --card-bg: #1a1a1a;
+  --border: #2a2a2a;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+body {
+  width: 400px;
+  max-height: 560px;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 16px;
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.subhead { color: var(--fg-dim); font-size: 0.8rem; margin-bottom: 16px; }
+
+#analyze-btn {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 10px 24px;
+  width: 100%;
+  background: var(--amber);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+}
+
+#analyze-btn:hover { opacity: 0.85; }
+#analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.hidden { display: none !important; }
+
+#loading-state {
+  text-align: center;
+  padding: 40px 0;
+  font-family: var(--mono);
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+@keyframes ellipsis { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+#loading-state .ld::after { content: ''; animation: ellipsis 1.5s infinite; }
+
+.error-msg { color: var(--red); font-family: var(--mono); font-size: 0.8rem; margin-top: 10px; }
+
+/* Results */
+.score-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.composite-score { font-family: var(--mono); font-size: 2.4rem; font-weight: 600; line-height: 1; }
+.grade { font-family: var(--mono); font-size: 1.4rem; font-weight: 600; }
+.score-green { color: var(--green); }
+.score-amber { color: var(--amber); }
+.score-red { color: var(--red); }
+
+.summary { color: var(--fg-dim); font-size: 0.82rem; margin-bottom: 16px; line-height: 1.6; }
+
+.section-title {
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; color: var(--amber);
+}
+
+.dim-card {
+  background: var(--card-bg); border: 1px solid var(--border); padding: 10px 12px; margin-bottom: 8px;
+}
+.dim-name {
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-dim); margin-bottom: 4px;
+}
+.dim-bar-track { height: 3px; background: var(--border); margin-bottom: 4px; }
+.dim-bar-fill { height: 100%; }
+.dim-score-label { font-family: var(--mono); font-size: 0.72rem; margin-bottom: 4px; }
+.dim-notes { font-size: 0.78rem; color: var(--fg-dim); line-height: 1.4; }
+.dim-card.locked .dim-name::before { content: '\1F512 '; }
+
+.weak-item {
+  border-left: 2px solid var(--amber); padding: 8px 10px; margin-bottom: 8px; background: var(--card-bg);
+}
+.weak-sentence { font-style: italic; font-size: 0.8rem; margin-bottom: 4px; }
+.weak-reason { font-size: 0.75rem; color: var(--fg-dim); margin-bottom: 4px; }
+.weak-meta { display: flex; align-items: center; gap: 6px; }
+.weak-category {
+  font-family: var(--mono); font-size: 0.65rem; background: var(--border); padding: 1px 6px; color: var(--fg-dim);
+}
+.copy-btn {
+  font-family: var(--mono); font-size: 0.65rem; background: transparent;
+  border: 1px solid var(--border); color: var(--fg-dim); padding: 1px 6px; cursor: pointer;
+}
+
+.footer-links {
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between;
+}
+
+.footer-links a, .footer-links button {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--amber);
+  text-decoration: none; background: none; border: none; cursor: pointer;
+}
+
+.footer-links a:hover, .footer-links button:hover { text-decoration: underline; }
+
+.invalid-page { color: var(--fg-dim); font-size: 0.85rem; text-align: center; padding: 24px 0; }
+</style>
+</head>
+<body>
+  <div id="input-state">
+    <h1>EpistemicLens</h1>
+    <p class="subhead">Analyze the current article.</p>
+    <button id="analyze-btn">Analyze this article</button>
+    <div id="error-box" class="error-msg hidden"></div>
+  </div>
+
+  <div id="loading-state" class="hidden">
+    <p class="ld">Analyzing article</p>
+  </div>
+
+  <div id="results-state" class="hidden"></div>
+
+  <div id="invalid-state" class="hidden">
+    <p class="invalid-page">Navigate to a news article to use EpistemicLens.</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
