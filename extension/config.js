@@ -1,1 +1,1 @@
-const BACKEND_URL = "https://illustrious-nougat-b0b3a0.netlify.app/api/score";
+const BACKEND_URL = "https://epistemiclens.com/api/score";
