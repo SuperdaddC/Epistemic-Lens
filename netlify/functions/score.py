@@ -1,30 +1,13 @@
 import json
 import os
 import re
-from datetime import datetime, timezone
 
 import httpx
 import trafilatura
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
-from openai import OpenAI, APIError
-from pydantic import BaseModel
-from supabase import create_client
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from openai import OpenAI
 
 MOONSHOT_API_KEY = os.environ.get("MOONSHOT_API_KEY")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 SYSTEM_PROMPT = (
     "You are an epistemic analysis engine. You evaluate news articles strictly on "
@@ -69,19 +52,14 @@ ARTICLE TEXT:
 """
 
 
-class ScoreRequest(BaseModel):
-    input: str
-    input_type: str  # "url" or "text"
-
-
-def trim_article(text: str, max_words: int = 3000) -> str:
+def trim_article(text, max_words=3000):
     words = text.split()
     if len(words) <= max_words:
         return text
     return " ".join(words[:2500]) + " [...] " + " ".join(words[-500:])
 
 
-def extract_from_url(url: str) -> str:
+def extract_from_url(url):
     resp = httpx.get(url, follow_redirects=True, timeout=15.0, headers={
         "User-Agent": "Mozilla/5.0 (compatible; EpistemicLens/1.0)"
     })
@@ -105,7 +83,7 @@ def extract_from_url(url: str) -> str:
     raise ValueError("Could not extract article text from the provided URL.")
 
 
-def call_llm(article_text: str) -> dict:
+def call_llm(article_text):
     client = OpenAI(
         api_key=MOONSHOT_API_KEY,
         base_url="https://api.moonshot.ai/v1",
@@ -122,7 +100,6 @@ def call_llm(article_text: str) -> dict:
     )
 
     raw = response.choices[0].message.content.strip()
-    # Strip markdown code fences if present
     if raw.startswith("```"):
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
@@ -130,58 +107,64 @@ def call_llm(article_text: str) -> dict:
     return json.loads(raw)
 
 
-def save_to_supabase(url: str | None, extracted_text: str, score_json: dict):
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return
-    sb = create_client(SUPABASE_URL, SUPABASE_KEY)
-    sb.table("epistemic_scores").insert({
-        "url": url,
-        "extracted_text": extracted_text[:10000],
-        "score_json": score_json,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }).execute()
+def make_response(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        },
+        "body": json.dumps(body),
+    }
 
 
-@app.post("/api/score")
-async def score_article(req: ScoreRequest):
-    if req.input_type not in ("url", "text"):
-        raise HTTPException(status_code=400, detail="input_type must be 'url' or 'text'")
+def handler(event, context):
+    # Handle CORS preflight
+    if event.get("httpMethod") == "OPTIONS":
+        return make_response(200, {})
 
-    if not req.input or not req.input.strip():
-        raise HTTPException(status_code=400, detail="input must not be empty")
+    if event.get("httpMethod") != "POST":
+        return make_response(405, {"detail": "Method not allowed"})
+
+    try:
+        body = json.loads(event.get("body", "{}"))
+    except json.JSONDecodeError:
+        return make_response(400, {"detail": "Invalid JSON body"})
+
+    input_text = body.get("input", "").strip()
+    input_type = body.get("input_type", "")
+
+    if input_type not in ("url", "text"):
+        return make_response(400, {"detail": "input_type must be 'url' or 'text'"})
+
+    if not input_text:
+        return make_response(400, {"detail": "input must not be empty"})
 
     url = None
     try:
-        if req.input_type == "url":
-            url = req.input.strip()
+        if input_type == "url":
+            url = input_text
             article_text = extract_from_url(url)
         else:
-            article_text = req.input.strip()
+            article_text = input_text
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to extract article: {e}")
+        return make_response(400, {"detail": f"Failed to extract article: {e}"})
 
     if len(article_text.strip()) < 50:
-        raise HTTPException(status_code=400, detail="Extracted text is too short to analyze.")
+        return make_response(400, {"detail": "Extracted text is too short to analyze."})
 
     trimmed = trim_article(article_text)
 
     try:
         score_json = call_llm(trimmed)
     except json.JSONDecodeError:
-        # Retry once on malformed JSON
         try:
             score_json = call_llm(trimmed)
         except json.JSONDecodeError:
-            raise HTTPException(status_code=502, detail="AI returned malformed response after retry.")
-    except APIError as e:
-        raise HTTPException(status_code=502, detail=f"LLM API error: {e}")
+            return make_response(502, {"detail": "AI returned malformed response after retry."})
+    except Exception as e:
+        return make_response(502, {"detail": f"LLM API error: {e}"})
 
-    try:
-        save_to_supabase(url, trimmed, score_json)
-    except Exception:
-        pass  # Don't fail the request if storage fails
-
-    return score_json
-
-
-handler = Mangum(app, lifespan="off")
+    return make_response(200, score_json)
