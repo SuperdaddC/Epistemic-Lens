@@ -6,7 +6,6 @@
 
 [functions]
   directory = "netlify/functions"
-  included_files = ["requirements.txt"]
 
 [[redirects]]
   from = "/api/score"
