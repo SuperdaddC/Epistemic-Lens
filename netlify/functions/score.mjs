@@ -100,6 +100,7 @@ async function callLLM(articleText) {
   const response = await client.chat.completions.create({
     model: "kimi-k2-turbo-preview",
     max_tokens: 4096,
+    temperature: 0,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: USER_PROMPT_TEMPLATE + articleText },
