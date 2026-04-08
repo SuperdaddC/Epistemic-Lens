@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { Readability } from "@mozilla/readability";
+import { JSDOM } from "jsdom";
 
 const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
 
@@ -51,44 +53,31 @@ function trimArticle(text, maxWords = 3000) {
 
 async function extractFromUrl(url) {
   const resp = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; EpistemicLens/1.0)" },
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
     redirect: "follow",
   });
   if (!resp.ok) throw new Error(`Failed to fetch URL: ${resp.status} ${resp.statusText}`);
 
   const html = await resp.text();
+  const dom = new JSDOM(html, { url });
+  const reader = new Readability(dom.window.document);
+  const article = reader.parse();
 
-  // Extract text from HTML — simple but effective approach
-  // Strip scripts, styles, then extract text from article/main/body
-  let cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<header[\s\S]*?<\/header>/gi, "")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, "");
-
-  // Try to find article or main content
-  const articleMatch = cleaned.match(/<article[\s\S]*?<\/article>/i);
-  const mainMatch = cleaned.match(/<main[\s\S]*?<\/main>/i);
-  const contentHtml = articleMatch?.[0] || mainMatch?.[0] || cleaned;
-
-  // Strip all HTML tags and decode entities
-  let text = contentHtml
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (text.length < 100) {
-    throw new Error("Could not extract meaningful article text from the URL.");
+  if (article && article.textContent && article.textContent.trim().length > 100) {
+    return article.textContent.trim();
   }
 
-  return text;
+  // Fallback: basic extraction from body
+  const body = dom.window.document.body;
+  if (body) {
+    const text = body.textContent.replace(/\s+/g, " ").trim();
+    if (text.length > 100) return text;
+  }
+
+  throw new Error("Could not extract meaningful article text from the URL.");
 }
 
 async function callLLM(articleText) {

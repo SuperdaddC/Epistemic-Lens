@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^29.0.2",
     "openai": "^6.33.0"
   }
 }
