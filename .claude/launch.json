@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "epistemic-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "C:/Users/ColyerTeam/Developer/epistemic-lens", "-p", "3001", "-c-1"],
+      "port": 3001
+    }
+  ]
+}

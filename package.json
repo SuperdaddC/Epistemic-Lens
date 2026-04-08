@@ -1,0 +1,8 @@
+{
+  "name": "epistemic-lens",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "openai": "^1.50.0"
+  }
+}
