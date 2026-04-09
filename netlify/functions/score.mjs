@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { parseHTML } from "linkedom";
 
 const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
 
@@ -62,8 +62,12 @@ async function extractFromUrl(url) {
   if (!resp.ok) throw new Error(`Failed to fetch URL: ${resp.status} ${resp.statusText}`);
 
   const html = await resp.text();
-  const dom = new JSDOM(html, { url });
-  const reader = new Readability(dom.window.document);
+  const { document } = parseHTML(html);
+
+  // Set documentURI for Readability
+  try { Object.defineProperty(document, "documentURI", { value: url }); } catch {}
+
+  const reader = new Readability(document);
   const article = reader.parse();
 
   if (article && article.textContent && article.textContent.trim().length > 100) {
@@ -71,7 +75,7 @@ async function extractFromUrl(url) {
   }
 
   // Fallback: basic extraction from body
-  const body = dom.window.document.body;
+  const body = document.body;
   if (body) {
     const text = body.textContent.replace(/\s+/g, " ").trim();
     if (text.length > 100) return text;
